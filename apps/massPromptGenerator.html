@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Prompt Generator</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box;
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+            text-align: center;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .input-group input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .input-group input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+        .button:disabled {
+            background-color: #aaa;
+        }
+        .button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        .progress {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #4caf50;
+            width: 0;
+            transition: width 0.4s;
+        }
+        .loading-message {
+            margin-bottom: 10px;
+            color: #555;
+            text-align: center;
+            display: none;
+        }
+        .result {
+            white-space: pre-wrap;
+            background: #f4f4f4;
+            padding: 20px;
+            border: 1px solid #ccc;
+            margin-top: 20px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .file-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .file-table th, .file-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .file-table th {
+            background-color: #f2f2f2;
+        }
+        .param-link {
+            color: #007bff;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Prompt Generator</h2>
+    <div class="input-group">
+        <label for="prompt">Enter Prompt Template:</label>
+        <input type="text" id="prompt" class="prompt-input" placeholder="example text, p1, more text, p2">
+    </div>
+    <div class="input-group">
+        <input type="file" id="fileInput" class="file-input" multiple>
+    </div>
+    <table class="file-table" id="fileTable">
+        <thead>
+            <tr>
+                <th>Parameter Name</th>
+                <th>File Name</th>
+                <th>Optional</th>
+                <th>Remove</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <button class="button" onclick="generatePrompts()">Generate Prompts</button>
+    <div class="progress">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="loading-message" id="loadingMessage">Generating prompts, please wait...</div>
+    <div class="result" id="result"></div>
+</div>
+
+<script>
+    let filesData = {};
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+    function handleFileSelect(event) {
+        const files = event.target.files;
+        const fileTableBody = document.getElementById('fileTable').getElementsByTagName('tbody')[0];
+        fileTableBody.innerHTML = ''; // Clear previous entries
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const paramName = 'p' + (i + 1);
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                filesData[paramName] = e.target.result.split('\n').map(line => line.trim()).filter(line => line);
+
+                const newRow = fileTableBody.insertRow();
+                const paramNameCell = newRow.insertCell(0);
+                const fileNameCell = newRow.insertCell(1);
+                const optionalCell = newRow.insertCell(2);
+                const removeCell = newRow.insertCell(3);
+
+                const paramLink = document.createElement('span');
+                paramLink.className = 'param-link';
+                paramLink.textContent = paramName;
+                paramLink.onclick = function() {
+                    document.getElementById('prompt').value += `, ${paramName}`;
+                };
+
+                paramNameCell.appendChild(paramLink);
+                fileNameCell.textContent = file.name;
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'optional';
+                checkbox.value = paramName;
+                optionalCell.appendChild(checkbox);
+
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove';
+                removeButton.onclick = function() {
+                    delete filesData[paramName];
+                    fileTableBody.removeChild(newRow);
+                };
+                removeCell.appendChild(removeButton);
+            };
+            reader.readAsText(file);
+        }
+    }
+
+    async function generatePrompts() {
+        const promptTemplate = document.getElementById('prompt').value;
+        const optionalParams = Array.from(document.querySelectorAll('input[name="optional"]:checked')).map(checkbox => checkbox.value);
+        const resultElement = document.getElementById('result');
+        const progressBar = document.getElementById('progressBar');
+        const loadingMessage = document.getElementById('loadingMessage');
+
+        resultElement.textContent = '';
+        progressBar.style.width = '0%';
+        loadingMessage.style.display = 'block';
+        progressBar.parentElement.style.display = 'block';
+
+        let combinations = generateCombinations(promptTemplate, Object.keys(filesData), optionalParams);
+
+        let step = 100 / combinations.length;
+        for (let i = 0; i < combinations.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 20));
+            progressBar.style.width = (i + 1) * step + '%';
+        }
+
+        resultElement.textContent = combinations.join('\n');
+        loadingMessage.style.display = 'none';
+        downloadTxtFile(combinations);
+    }
+
+    function generateCombinations(template, params, optionalParams) {
+        let paramValues = params.map(param => filesData[param]);
+        let combinations = [];
+
+        function helper(current, index) {
+            if (index === params.length) {
+                let result = template.replace(/\bp\d+\b/g, (match) => current[params.indexOf(match)] || '');
+                result = result.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
+                combinations.push(result);
+                return;
+            }
+            let param = params[index];
+            if (optionalParams.includes(param)) {
+                helper([...current], index + 1);
+            }
+            for (let value of filesData[param]) {
+                helper([...current, value], index + 1);
+            }
+        }
+
+        helper([], 0);
+        return combinations;
+    }
+
+    function downloadTxtFile(content) {
+        const element = document.createElement('a');
+        const file = new Blob([content.join('\n')], { type: 'text/plain' });
+        element.href = URL.createObjectURL(file);
+        element.download = 'generated_prompts.txt';
+        document.body.appendChild(element); // Required for this to work in FireFox
+        element.click();
+    }
+</script>
+
+</body>
+</html>

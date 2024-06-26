@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image API Processor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        #results {
+            margin-top: 20px;
+            width: 100%;
+        }
+        .result-item {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+            padding: 10px 0;
+        }
+        img {
+            max-width: 150px;
+            height: auto;
+            margin-right: 20px;
+        }
+        .result-data {
+            text-align: left;
+        }
+        #progressContainer {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        #progressBar {
+            width: 0;
+            height: 20px;
+            background-color: #4caf50;
+            border-radius: 10px;
+        }
+        #progressText {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload Images and Get Descriptions</h1>
+        <input type="file" id="fileInput" multiple accept="image/*">
+        <button id="uploadBtn">Upload and Process</button>
+        <button id="exportBtn">Export to CSV</button>
+        <div id="progressContainer">
+            <div id="progressBar"></div>
+        </div>
+        <div id="progressText"></div>
+        <div id="results"></div>
+    </div>
+    <script>
+        const resultsData = [];
+        const serverUrl = "http://100.96.1.2:11434";
+
+        document.getElementById('uploadBtn').addEventListener('click', async () => {
+            const files = document.getElementById('fileInput').files;
+            if (files.length === 0) {
+                alert('Please select some image files.');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            progressBar.style.width = '0%';
+            progressText.textContent = `Processing image 1 of ${files.length}`;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                let base64 = null;
+
+                try {
+                    base64 = await resizeAndConvertToBase64(file);
+                } catch (err) {
+                    console.error("Error processing image: ", file);
+                    console.error(err);
+                    continue;
+                }
+
+                const [titleResponse, keywordsResponse] = await Promise.all([
+                    fetch(serverUrl + '/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: 'llava',
+                            prompt: 'write me a one sentenced title in one sentence for this image that best describes the image, style, what it represents and what it can bu used for. try to include keywords for people who might look for a photo like this. remove unnecessary word. keep it under 190 chars',
+                            stream: false,
+                            images: [base64]
+                        })
+                    }),
+                    fetch(serverUrl + '/api/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: 'llava',
+                            prompt: 'write me the top 15 words that best describes the image, style, what it represents and what it can bu used for, in one word, and put the most relevant and important ones first. use commas and no numbers',
+                            stream: false,
+                            images: [base64]
+                        })
+                    })
+                ]);
+
+                const titleResult = await titleResponse.json();
+                const keywordsResult = await keywordsResponse.json();
+
+                const title = parseTitle(titleResult.response);
+                const keywords = parseKeywords(keywordsResult.response);
+
+                resultsData.push({ filename: file.name, title, keywords });
+                displayResult(file.name, base64, title, keywords);
+
+                const progressPercent = ((i + 1) / files.length) * 100;
+                progressBar.style.width = progressPercent + '%';
+                progressText.textContent = i < files.length - 1 
+                    ? `Processing image ${i + 2} of ${files.length}` 
+                    : 'Done';
+            }
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (resultsData.length === 0) {
+                alert('No data to export.');
+                return;
+            }
+            exportToCSV(resultsData);
+        });
+
+        function resizeAndConvertToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => {
+                    const img = new Image();
+                    img.src = reader.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width / 4;
+                        canvas.height = img.height / 4;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg').split(',')[1]);
+                    };
+                    img.onerror = error => reject(error);
+                };
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function parseTitle(response) {
+            return response.replace(/"/g, '').trim().substring(0, 199);
+        }
+
+        function parseKeywords(response) {
+            // Remove quotes and split the response into an array
+            const keywordsArray = response.replace(/"/g, '').split(',').map(keyword => keyword.trim());
+
+            let allKeywords = [];
+
+            for (let keyword of keywordsArray) {
+                allKeywords = allKeywords.concat(keyword.split(' '));
+            }
+
+            // Filter out duplicates and join the keywords back into a comma-separated string
+            const uniqueKeywords = [...new Set(allKeywords)].join(', ');
+
+            return uniqueKeywords;
+        }
+
+        function displayResult(filename, base64, title, keywords) {
+            const resultsDiv = document.getElementById('results');
+            const resultItem = document.createElement('div');
+            resultItem.className = 'result-item';
+
+            const img = document.createElement('img');
+            img.src = `data:image/jpeg;base64,${base64}`;
+            resultItem.appendChild(img);
+
+            const resultData = document.createElement('div');
+            resultData.className = 'result-data';
+            resultData.innerHTML = `<strong>File:</strong> ${filename}<br><strong>Title:</strong> ${title}<br><strong>Keywords:</strong> ${keywords}`;
+
+            resultItem.appendChild(resultData);
+            resultsDiv.appendChild(resultItem);
+        }
+
+        function exportToCSV(data) {
+            const csvContent = 'data:text/csv;charset=utf-8,' 
+                + ['Filename,Title,Keywords,Category,Release', ...data.map(item => `${item.filename},"${item.title}","${item.keywords}","",""`)].join('\n');
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', 'results.csv');
+            document.body.appendChild(link);
+
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ollama Simple Web UI</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+    }
+
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      width: 500px;
+    }
+
+    h1 {
+      font-size: 24px;
+      color: #333;
+    }
+
+    input,
+    select {
+      width: calc(100% - 22px);
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+    }
+
+    button {
+      background: #04AA6D;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    .blue {
+      background: #008CBA;
+    }
+
+    .response {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      color: #333;
+      text-align: left;
+    }
+
+    .center {
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Ollama Simple Web UI</h1>
+    <div>Don't forget to enable CORS: <a href="https://medium.com/dcoderai/how-to-handle-cors-settings-in-ollama-a-comprehensive-guide-ee2a5a1beef0">https://medium.com/dcoderai/how-to-handle-cors-settings-in-ollama-a-comprehensive-guide-ee2a5a1beef0</a></div>
+    <br />
+    <label for="urlInput">URL:</label>
+    <input type="text" id="urlInput" placeholder="Enter API URL" />
+    <label for="modelSelect">Model:</label>
+    <select id="modelSelect">
+      <option value="llama3">llama3</option>
+      <option value="dolphin-llama3" selected>dolphin-llama3</option>
+      <option value="dolphin-phi">dolphin-phi</option>
+      <option value="phi3">phi3</option>
+    </select>
+    <label for="promptInput">Prompt:</label>
+    <input type="text" id="promptInput" placeholder="Enter prompt" />
+    <div class="center">
+      <button id="fetchButton" class="blue">Fetch Response</button>
+      <button id="loadModelsButton">Load Available Models</button>  
+    </div>
+    <div id="response" class="response" style="display: none;"></div>
+  </div>
+
+
+  <script>
+    const loadingText = "Loading...";
+    document.addEventListener('DOMContentLoaded', function () {
+      const urlInput = document.getElementById('urlInput');
+      const storedUrl = localStorage.getItem('apiBaseUrl');
+      urlInput.value = storedUrl ? storedUrl : 'http://localhost:11434';
+
+      const fetchButton = document.getElementById('fetchButton');
+      const loadModelsButton = document.getElementById('loadModelsButton');
+      const responseDiv = document.getElementById('response');
+      const modelSelect = document.getElementById('modelSelect');
+
+      fetchButton.addEventListener('click', async function () {
+        const apiUrl = urlInput.value + '/api/generate';
+        const model = modelSelect.value;
+        const prompt = document.getElementById('promptInput').value;
+        document.getElementById('promptInput').value = '';
+
+        localStorage.setItem('apiBaseUrl', urlInput.value);
+
+        responseDiv.style.display = 'block';
+
+        let displayPrompt = "Prompt: " + prompt + "\n";
+
+        responseDiv.innerText = displayPrompt + loadingText;
+        let isLoadingShowed = true;
+
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: model,
+              prompt: prompt
+            })
+          });
+
+          if (!response.body) {
+            throw new Error('ReadableStream not supported.');
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let done = false;
+
+          responseDiv.style.display = 'block';
+
+          while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            done = readerDone;
+
+            const chunk = decoder.decode(value, { stream: true });
+
+            chunks = chunk.split('\n');
+
+            for (let chunk of chunks) {
+              if (chunk == "") {
+                continue;
+              }
+              const data = JSON.parse(chunk);
+
+              if (isLoadingShowed) {
+                responseDiv.innerText = displayPrompt;
+                isLoadingShowed = false;
+              }
+
+              responseDiv.innerText += data.response;
+            }
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          // responseDiv.innerText = 'Error: ' + error.message;
+        }
+      });
+
+      loadModelsButton.addEventListener('click', function () {
+        const apiUrl = urlInput.value + '/api/tags';
+
+        responseDiv.style.display = 'block';
+        responseDiv.innerText = loadingText;
+
+        fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            const models = data.models;
+            modelSelect.innerHTML = '';
+            models.forEach(model => {
+              const option = document.createElement('option');
+              option.value = model.name;
+              option.text = model.name;
+              modelSelect.appendChild(option);
+            });
+
+            responseDiv.style.display = 'none';
+          })
+          .catch(error => {
+            responseDiv.style.display = 'block';
+            responseDiv.innerText = 'Error: ' + error.message;
+          });
+      });
+    });
+  </script>
+</body>
+
+</html>
