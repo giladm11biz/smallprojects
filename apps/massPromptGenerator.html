@@ -35,7 +35,8 @@
             margin-bottom: 5px;
             color: #555;
         }
-        .input-group input[type="text"] {
+        .input-group input[type="text"],
+        .input-group input[type="number"] {
             width: calc(100% - 20px);
             padding: 10px;
             border: 1px solid #ddd;
@@ -127,6 +128,10 @@
         <input type="text" id="prompt" class="prompt-input" placeholder="example text, p1, more text, p2">
     </div>
     <div class="input-group">
+        <label for="linesPerFile">Lines Per File:</label>
+        <input type="number" id="linesPerFile" class="prompt-input" value="1000000">
+    </div>
+    <div class="input-group">
         <input type="file" id="fileInput" class="file-input" multiple>
     </div>
     <table class="file-table" id="fileTable">
@@ -186,7 +191,7 @@
                 checkbox.name = 'optional';
                 checkbox.value = paramName;
                 optionalCell.appendChild(checkbox);
-
+                
                 const removeButton = document.createElement('button');
                 removeButton.textContent = 'Remove';
                 removeButton.onclick = function() {
@@ -202,6 +207,7 @@
     async function generatePrompts() {
         const promptTemplate = document.getElementById('prompt').value;
         const optionalParams = Array.from(document.querySelectorAll('input[name="optional"]:checked')).map(checkbox => checkbox.value);
+        const linesPerFile = parseInt(document.getElementById('linesPerFile').value, 10);
         const resultElement = document.getElementById('result');
         const progressBar = document.getElementById('progressBar');
         const loadingMessage = document.getElementById('loadingMessage');
@@ -211,50 +217,60 @@
         loadingMessage.style.display = 'block';
         progressBar.parentElement.style.display = 'block';
 
-        let combinations = generateCombinations(promptTemplate, Object.keys(filesData), optionalParams);
-
-        let step = 100 / combinations.length;
-        for (let i = 0; i < combinations.length; i++) {
-            await new Promise(resolve => setTimeout(resolve, 20));
-            // progressBar.style.width = (i + 1) * step + '%';
-        }
-
-        // resultElement.textContent = combinations.join('\n');
-        loadingMessage.style.display = 'none';
-        downloadTxtFile(combinations);
-    }
-
-    function generateCombinations(template, params, optionalParams) {
-        let paramValues = params.map(param => filesData[param]);
+        let params = Object.keys(filesData);
+        let totalCombinations = params.reduce((acc, param) => acc * filesData[param].length, 1);
         let combinations = [];
+        let currentIndex = Array(params.length).fill(0);
 
-        function helper(current, index) {
-            if (index === params.length) {
-                let result = template.replace(/\bp\d+\b/g, (match) => current[params.indexOf(match)] || '');
-                result = result.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
-                combinations.push(result);
-                return;
+        for (let i = 0; i < totalCombinations; i++) {
+            let currentCombination = promptTemplate;
+            let skipCombination = false;
+
+            for (let j = 0; j < params.length; j++) {
+                let paramName = params[j];
+                if (optionalParams.includes(paramName) && currentIndex[j] === 0) {
+                    currentCombination = currentCombination.replace(new RegExp(`,?\\s*${paramName}`, 'g'), '');
+                } else {
+                    currentCombination = currentCombination.replace(paramName, filesData[paramName][currentIndex[j]]);
+                }
             }
-            let param = params[index];
-            if (optionalParams.includes(param)) {
-                helper([...current], index + 1);
+
+            currentCombination = currentCombination.replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^,\s*/, '');
+            combinations.push(currentCombination);
+
+            if (combinations.length >= linesPerFile) {
+                await downloadTxtFile(combinations, i / linesPerFile + 1);
+                combinations = [];
             }
-            for (let value of filesData[param]) {
-                helper([...current, value], index + 1);
+
+            for (let k = params.length - 1; k >= 0; k--) {
+                currentIndex[k]++;
+                if (currentIndex[k] < filesData[params[k]].length) break;
+                currentIndex[k] = 0;
             }
+
+            progressBar.style.width = (i / totalCombinations) * 100 + '%';
         }
 
-        helper([], 0);
-        return combinations;
+        if (combinations.length > 0) {
+            await downloadTxtFile(combinations, Math.ceil(totalCombinations / linesPerFile));
+        }
+
+        progressBar.style.width = '100%';
+        loadingMessage.style.display = 'none';
     }
 
-    function downloadTxtFile(content) {
-        const element = document.createElement('a');
-        const file = new Blob([content.join('\n')], { type: 'text/plain' });
-        element.href = URL.createObjectURL(file);
-        element.download = 'generated_prompts.txt';
-        document.body.appendChild(element); // Required for this to work in FireFox
-        element.click();
+    function downloadTxtFile(content, part) {
+        return new Promise((resolve) => {
+            const element = document.createElement('a');
+            const file = new Blob([content.join('\n')], { type: 'text/plain' });
+            element.href = URL.createObjectURL(file);
+            element.download = `generated_prompts_part_${part}.txt`;
+            document.body.appendChild(element); // Required for this to work in FireFox
+            element.click();
+            document.body.removeChild(element);
+            resolve();
+        });
     }
 </script>
 
