@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PROMPT_FILE="prompts.txt"
+PROMPT_FILE="p.txt"
 OUTPUT_DIR="generated_images"
 API_URL="http://localhost:7860/api/v1/txt2img" # Replace with your actual API endpoint
 TOTAL_PROMPTS=$(wc -l < "$PROMPT_FILE")
