@@ -2,7 +2,7 @@
 
 PROMPT_FILE="p.txt"
 OUTPUT_DIR="generated_images"
-API_URL="http://localhost:7860/api/v1/txt2img" # Replace with your actual API endpoint
+API_URL="http://localhost:7860/sdapi/v1/txt2img" # Replace with your actual API endpoint
 TOTAL_PROMPTS=$(wc -l < "$PROMPT_FILE")
 
 NEGATIVE_PROMPT="(nsfw, naked, nude, deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime, mutated hands and fingers:1.4), (deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, disconnected limbs, mutation, mutated, ugly, disgusting, amputation"

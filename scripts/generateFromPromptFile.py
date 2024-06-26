@@ -6,7 +6,7 @@ import time
 
 PROMPT_FILE = "p.txt"
 OUTPUT_DIR = "generated_images"
-API_URL = "http://localhost:7860/api/v1/txt2img"
+API_URL = "http://localhost:7860/sdapi/v1/txt2img"
 NEGATIVE_PROMPT = "(nsfw, naked, nude, deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime, mutated hands and fingers:1.4), (deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, disconnected limbs, mutation, mutated, ugly, disgusting, amputation"
 
 if not os.path.exists(OUTPUT_DIR):
