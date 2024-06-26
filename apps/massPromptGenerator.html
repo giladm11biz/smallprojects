@@ -216,10 +216,10 @@
         let step = 100 / combinations.length;
         for (let i = 0; i < combinations.length; i++) {
             await new Promise(resolve => setTimeout(resolve, 20));
-            progressBar.style.width = (i + 1) * step + '%';
+            // progressBar.style.width = (i + 1) * step + '%';
         }
 
-        resultElement.textContent = combinations.join('\n');
+        // resultElement.textContent = combinations.join('\n');
         loadingMessage.style.display = 'none';
         downloadTxtFile(combinations);
     }
