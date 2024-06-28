@@ -72,6 +72,30 @@
     .center {
       text-align: center;
     }
+
+    .dropzone {
+      border: 2px dashed #ccc;
+      border-radius: 5px;
+      padding: 10px;
+      text-align: center;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+
+    .dropzone.dragover {
+      border-color: #008CBA;
+      background: #e0f7ff;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+    }
+
+    .checkbox-item input {
+      width: 15px;
+      margin-right: 10px;
+    }
   </style>
 </head>
 
@@ -92,8 +116,13 @@
     </select>
     <label for="promptInput">Prompt:</label>
     <input type="text" id="promptInput" placeholder="Enter prompt" />
+    <div class="checkbox-item">
+      <input type="checkbox" id="clearPromptCheckbox" />
+      <label for="clearPromptCheckbox">Don't clear prompt</label>
+    </div>
     <label for="fileInput">Upload Image:</label>
-    <input type="file" id="fileInput" />
+    <div class="dropzone" id="dropzone">Drag & drop an image or click to upload</div>
+    <input type="file" id="fileInput" style="display: none;" />
     <div class="center">
       <button id="fetchButton" class="blue">Fetch Response</button>
       <button id="loadModelsButton">Load Available Models</button>
@@ -113,13 +142,39 @@
       const responseDiv = document.getElementById('response');
       const modelSelect = document.getElementById('modelSelect');
       const fileInput = document.getElementById('fileInput');
+      const dropzone = document.getElementById('dropzone');
+      const clearPromptCheckbox = document.getElementById('clearPromptCheckbox');
+      const promptInput = document.getElementById('promptInput');
+
+      // Handle drag and drop
+      dropzone.addEventListener('click', () => fileInput.click());
+
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('dragover');
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+          fileInput.files = e.dataTransfer.files;
+        }
+      });
 
       fetchButton.addEventListener('click', async function () {
         const apiUrl = urlInput.value + '/api/generate';
         const model = modelSelect.value;
-        const prompt = document.getElementById('promptInput').value;
+        const prompt = promptInput.value;
         const file = fileInput.files[0];
-        document.getElementById('promptInput').value = '';
+
+        if (!clearPromptCheckbox.checked) {
+          promptInput.value = '';
+        }
 
         localStorage.setItem('apiBaseUrl', urlInput.value);
 
