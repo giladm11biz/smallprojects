@@ -13,6 +13,7 @@
       justify-content: center;
       align-items: center;
       margin: 0;
+      height: 100vh;
     }
 
     .container {
@@ -26,6 +27,7 @@
     h1 {
       font-size: 24px;
       color: #333;
+      text-align: center;
     }
 
     input,
@@ -64,6 +66,7 @@
       border-radius: 5px;
       color: #333;
       text-align: left;
+      white-space: pre-wrap;
     }
 
     .center {
@@ -85,16 +88,18 @@
       <option value="dolphin-llama3" selected>dolphin-llama3</option>
       <option value="dolphin-phi">dolphin-phi</option>
       <option value="phi3">phi3</option>
+      <option value="llava">llava</option>
     </select>
     <label for="promptInput">Prompt:</label>
     <input type="text" id="promptInput" placeholder="Enter prompt" />
+    <label for="fileInput">Upload Image:</label>
+    <input type="file" id="fileInput" />
     <div class="center">
       <button id="fetchButton" class="blue">Fetch Response</button>
-      <button id="loadModelsButton">Load Available Models</button>  
+      <button id="loadModelsButton">Load Available Models</button>
     </div>
     <div id="response" class="response" style="display: none;"></div>
   </div>
-
 
   <script>
     const loadingText = "Loading...";
@@ -107,11 +112,13 @@
       const loadModelsButton = document.getElementById('loadModelsButton');
       const responseDiv = document.getElementById('response');
       const modelSelect = document.getElementById('modelSelect');
+      const fileInput = document.getElementById('fileInput');
 
       fetchButton.addEventListener('click', async function () {
         const apiUrl = urlInput.value + '/api/generate';
         const model = modelSelect.value;
         const prompt = document.getElementById('promptInput').value;
+        const file = fileInput.files[0];
         document.getElementById('promptInput').value = '';
 
         localStorage.setItem('apiBaseUrl', urlInput.value);
@@ -123,16 +130,24 @@
         responseDiv.innerText = displayPrompt + loadingText;
         let isLoadingShowed = true;
 
+        const payload = {
+          model: model,
+          prompt: prompt,
+          stream: false,
+          images: []
+        };
+
+        if (file) {
+          payload.images.push(await fileToBase64(file));
+        }
+
         try {
           const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              model: model,
-              prompt: prompt
-            })
+            body: JSON.stringify(payload)
           });
 
           if (!response.body) {
@@ -151,25 +166,30 @@
 
             const chunk = decoder.decode(value, { stream: true });
 
-            chunks = chunk.split('\n');
+            const chunks = chunk.split('\n');
 
             for (let chunk of chunks) {
-              if (chunk == "") {
+              if (chunk === "") {
                 continue;
               }
-              const data = JSON.parse(chunk);
+              try {
+                const data = JSON.parse(chunk);
 
-              if (isLoadingShowed) {
-                responseDiv.innerText = displayPrompt;
-                isLoadingShowed = false;
+                if (isLoadingShowed) {
+                  responseDiv.innerText = displayPrompt;
+                  isLoadingShowed = false;
+                }
+
+                responseDiv.innerText += data.response;
+              } catch (error) {
+                console.error('JSON parse error:', error);
+                responseDiv.innerText += '\nError parsing response: ' + error.message;
               }
-
-              responseDiv.innerText += data.response;
             }
           }
         } catch (error) {
           console.error('Error:', error);
-          // responseDiv.innerText = 'Error: ' + error.message;
+          responseDiv.innerText = 'Error: ' + error.message;
         }
       });
 
@@ -203,6 +223,15 @@
             responseDiv.innerText = 'Error: ' + error.message;
           });
       });
+
+      async function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data URL part
+          reader.onerror = error => reject(error);
+          reader.readAsDataURL(file);
+        });
+      }
     });
   </script>
 </body>
