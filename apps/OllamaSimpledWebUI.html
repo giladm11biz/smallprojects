@@ -73,20 +73,6 @@
       text-align: center;
     }
 
-    .dropzone {
-      border: 2px dashed #ccc;
-      border-radius: 5px;
-      padding: 10px;
-      text-align: center;
-      margin: 10px 0;
-      cursor: pointer;
-    }
-
-    .dropzone.dragover {
-      border-color: #008CBA;
-      background: #e0f7ff;
-    }
-
     .checkbox-item {
       display: flex;
       align-items: center;
@@ -113,6 +99,7 @@
       <option value="dolphin-phi">dolphin-phi</option>
       <option value="phi3">phi3</option>
       <option value="llava">llava</option>
+      <option value="mistral">mistral</option>
     </select>
     <label for="promptInput">Prompt:</label>
     <input type="text" id="promptInput" placeholder="Enter prompt" />
@@ -120,9 +107,10 @@
       <input type="checkbox" id="clearPromptCheckbox" />
       <label for="clearPromptCheckbox">Don't clear prompt</label>
     </div>
+    <label for="seedInput">Seed (optional):</label>
+    <input type="number" id="seedInput" placeholder="Enter seed value" />
     <label for="fileInput">Upload Image:</label>
-    <div class="dropzone" id="dropzone">Drag & drop an image or click to upload</div>
-    <input type="file" id="fileInput" style="display: none;" />
+    <input type="file" id="fileInput" />
     <div class="center">
       <button id="fetchButton" class="blue">Fetch Response</button>
       <button id="loadModelsButton">Load Available Models</button>
@@ -142,34 +130,15 @@
       const responseDiv = document.getElementById('response');
       const modelSelect = document.getElementById('modelSelect');
       const fileInput = document.getElementById('fileInput');
-      const dropzone = document.getElementById('dropzone');
       const clearPromptCheckbox = document.getElementById('clearPromptCheckbox');
       const promptInput = document.getElementById('promptInput');
-
-      // Handle drag and drop
-      dropzone.addEventListener('click', () => fileInput.click());
-
-      dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-      });
-
-      dropzone.addEventListener('dragleave', () => {
-        dropzone.classList.remove('dragover');
-      });
-
-      dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-          fileInput.files = e.dataTransfer.files;
-        }
-      });
+      const seedInput = document.getElementById('seedInput');
 
       fetchButton.addEventListener('click', async function () {
         const apiUrl = urlInput.value + '/api/generate';
         const model = modelSelect.value;
         const prompt = promptInput.value;
+        const seed = seedInput.value;
         const file = fileInput.files[0];
 
         if (!clearPromptCheckbox.checked) {
@@ -191,6 +160,10 @@
           stream: false,
           images: []
         };
+
+        if (seed) {
+          payload.options = { seed: parseInt(seed) };
+        }
 
         if (file) {
           payload.images.push(await fileToBase64(file));
@@ -224,7 +197,7 @@
             const chunks = chunk.split('\n');
 
             for (let chunk of chunks) {
-              if (chunk === "") {
+              if (chunk.trim() === "") {
                 continue;
               }
               try {
