@@ -134,7 +134,11 @@
     </div>
     <div class="input-group">
         <label for="linesPerFile">Lines Per File:</label>
-        <input type="number" id="linesPerFile" class="prompt-input" value="100000">
+        <input type="number" id="linesPerFile" class="prompt-input" value="2000">
+    </div>
+    <div class="input-group">
+        <label for="randomGeneration">Random Generation:</label>
+        <input type="checkbox" id="randomGeneration" class="prompt-input" checked>
     </div>
     <div class="input-group">
         <input type="file" id="fileInput" class="file-input" multiple>
@@ -215,6 +219,7 @@
         const promptTemplate = document.getElementById('prompt').value;
         const optionalParams = Array.from(document.querySelectorAll('input[name="optional"]:checked')).map(checkbox => checkbox.value);
         const linesPerFile = parseInt(document.getElementById('linesPerFile').value, 10);
+        const randomGeneration = document.getElementById('randomGeneration').checked;
         const resultElement = document.getElementById('result');
         const progressBar = document.getElementById('progressBar');
         const loadingMessage = document.getElementById('loadingMessage');
@@ -224,13 +229,52 @@
         loadingMessage.style.display = 'block';
         progressBar.parentElement.style.display = 'block';
 
+        if (randomGeneration) {
+            await generateRandomPrompts(promptTemplate, optionalParams, linesPerFile);
+        } else {
+            await generateAllPrompts(promptTemplate, optionalParams, linesPerFile);
+        }
+
+        progressBar.style.width = '100%';
+        loadingMessage.style.display = 'none';
+    }
+
+    async function generateRandomPrompts(template, optionalParams, linesPerFile) {
+        let params = Object.keys(filesData);
+        let combinations = [];
+
+        for (let i = 0; i < linesPerFile; i++) {
+            let currentCombination = template;
+            for (let paramName of params) {
+                let values = filesData[paramName];
+                let randomIndex = Math.floor(Math.random() * values.length);
+                if (optionalParams.includes(paramName) && Math.random() < 0.5) {
+                    currentCombination = currentCombination.replace(new RegExp(`,?\\s*${paramName}`, 'g'), '');
+                } else {
+                    currentCombination = currentCombination.replace(paramName, values[randomIndex]);
+                }
+            }
+            currentCombination = currentCombination.replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^,\s*/, '');
+            combinations.push(currentCombination);
+            if (combinations.length >= linesPerFile) {
+                await downloadTxtFile(combinations, Math.ceil(i / linesPerFile));
+                combinations = [];
+            }
+        }
+
+        if (combinations.length > 0) {
+            await downloadTxtFile(combinations, Math.ceil(linesPerFile / linesPerFile));
+        }
+    }
+
+    async function generateAllPrompts(template, optionalParams, linesPerFile) {
         let params = Object.keys(filesData);
         let totalCombinations = calculateTotalCombinations(params, optionalParams);
         let combinations = [];
         let currentIndex = Array(params.length).fill(0);
 
         for (let i = 0; i < totalCombinations; i++) {
-            let currentCombination = promptTemplate;
+            let currentCombination = template;
             let skipCombination = false;
 
             for (let j = 0; j < params.length; j++) {
@@ -262,9 +306,6 @@
         if (combinations.length > 0) {
             await downloadTxtFile(combinations, Math.ceil(totalCombinations / linesPerFile));
         }
-
-        progressBar.style.width = '100%';
-        loadingMessage.style.display = 'none';
     }
 
     function calculateTotalCombinations(params, optionalParams) {
