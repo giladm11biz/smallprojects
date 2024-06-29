@@ -158,9 +158,19 @@
                     const img = new Image();
                     img.src = reader.result;
                     img.onload = () => {
+                        const targetMP = 0.451584;
+                        const originalWidth = img.width;
+                        const originalHeight = img.height;
+                        const originalMP = (originalWidth * originalHeight) / 1000000;
+
+                        const scaleFactor = Math.sqrt(targetMP / originalMP);
+
                         const canvas = document.createElement('canvas');
-                        canvas.width = img.width / 4;
-                        canvas.height = img.height / 4;
+                        canvas.width = originalWidth * scaleFactor;
+                        canvas.height = originalHeight * scaleFactor;
+
+                        console.log(canvas.width * canvas.height, 451584, canvas.width * canvas.height <= 451584);
+
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                         resolve(canvas.toDataURL('image/jpeg').split(',')[1]);
