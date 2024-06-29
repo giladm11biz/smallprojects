@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Prompt Generator</title>
@@ -13,6 +14,7 @@
             height: 100vh;
             margin: 0;
         }
+
         .container {
             background-color: #fff;
             padding: 30px;
@@ -22,19 +24,23 @@
             max-width: 800px;
             box-sizing: border-box;
         }
+
         h2 {
             margin-top: 0;
             color: #333;
             text-align: center;
         }
+
         .input-group {
             margin-bottom: 20px;
         }
+
         .input-group label {
             display: block;
             margin-bottom: 5px;
             color: #555;
         }
+
         .input-group input[type="text"],
         .input-group input[type="number"] {
             width: calc(100% - 20px);
@@ -43,6 +49,7 @@
             border-radius: 5px;
             box-sizing: border-box;
         }
+
         .input-group input[type="file"] {
             padding: 10px;
             border: 1px solid #ddd;
@@ -50,6 +57,7 @@
             width: 100%;
             box-sizing: border-box;
         }
+
         .button {
             width: 100%;
             padding: 15px;
@@ -63,12 +71,15 @@
             transition: background-color 0.3s;
             margin-bottom: 10px;
         }
+
         .button:disabled {
             background-color: #aaa;
         }
+
         .button:hover:not(:disabled) {
             background-color: #0056b3;
         }
+
         .progress {
             width: 100%;
             background-color: #f3f3f3;
@@ -77,18 +88,21 @@
             margin-bottom: 10px;
             display: none;
         }
+
         .progress-bar {
             height: 20px;
             background-color: #4caf50;
             width: 0;
             transition: width 0.4s;
         }
+
         .loading-message {
             margin-bottom: 10px;
             color: #555;
             text-align: center;
             display: none;
         }
+
         .result {
             white-space: pre-wrap;
             background: #f4f4f4;
@@ -99,244 +113,252 @@
             max-height: 200px;
             overflow-y: auto;
         }
+
         .file-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
             margin-bottom: 20px;
         }
-        .file-table th, .file-table td {
+
+        .file-table th,
+        .file-table td {
             border: 1px solid #ddd;
             padding: 8px;
             text-align: left;
         }
+
         .file-table th {
             background-color: #f2f2f2;
         }
+
         .param-link {
             color: #007bff;
             cursor: pointer;
             text-decoration: underline;
         }
+
         .summary {
             text-align: center;
             margin-top: 10px;
         }
     </style>
 </head>
+
 <body>
 
-<div class="container">
-    <h2>Prompt Generator</h2>
-    <div class="input-group">
-        <label for="prompt">Enter Prompt Template:</label>
-        <input type="text" id="prompt" class="prompt-input" placeholder="example text, p1, more text, p2">
+    <div class="container">
+        <h2>Prompt Generator</h2>
+        <div class="input-group">
+            <label for="prompt">Enter Prompt Template:</label>
+            <input type="text" id="prompt" class="prompt-input" placeholder="example text, p1, more text, p2">
+        </div>
+        <div class="input-group">
+            <label for="linesPerFile">Lines Per File:</label>
+            <input type="number" id="linesPerFile" class="prompt-input" value="2000">
+        </div>
+        <div class="input-group">
+            <label for="randomGeneration">Random Generation:</label>
+            <input type="checkbox" id="randomGeneration" class="prompt-input" checked>
+        </div>
+        <div class="input-group">
+            <input type="file" id="fileInput" class="file-input" multiple>
+        </div>
+        <table class="file-table" id="fileTable">
+            <thead>
+                <tr>
+                    <th>Parameter Name</th>
+                    <th>File Name</th>
+                    <th>Optional</th>
+                    <th>Remove</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+        <button class="button" onclick="generatePrompts()">Generate Prompts</button>
+        <button class="button" onclick="calculateTotalLines()">Show Total Lines</button>
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="loading-message" id="loadingMessage">Generating prompts, please wait...</div>
+        <div class="result" id="result"></div>
+        <div class="summary" id="summary"></div>
     </div>
-    <div class="input-group">
-        <label for="linesPerFile">Lines Per File:</label>
-        <input type="number" id="linesPerFile" class="prompt-input" value="2000">
-    </div>
-    <div class="input-group">
-        <label for="randomGeneration">Random Generation:</label>
-        <input type="checkbox" id="randomGeneration" class="prompt-input" checked>
-    </div>
-    <div class="input-group">
-        <input type="file" id="fileInput" class="file-input" multiple>
-    </div>
-    <table class="file-table" id="fileTable">
-        <thead>
-            <tr>
-                <th>Parameter Name</th>
-                <th>File Name</th>
-                <th>Optional</th>
-                <th>Remove</th>
-            </tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
-    <button class="button" onclick="generatePrompts()">Generate Prompts</button>
-    <button class="button" onclick="calculateTotalLines()">Show Total Lines</button>
-    <div class="progress">
-        <div class="progress-bar" id="progressBar"></div>
-    </div>
-    <div class="loading-message" id="loadingMessage">Generating prompts, please wait...</div>
-    <div class="result" id="result"></div>
-    <div class="summary" id="summary"></div>
-</div>
 
-<script>
-    let filesData = {};
+    <script>
+        let filesData = {};
 
-    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 
-    function handleFileSelect(event) {
-        const files = event.target.files;
-        const fileTableBody = document.getElementById('fileTable').getElementsByTagName('tbody')[0];
-        fileTableBody.innerHTML = ''; // Clear previous entries
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            const fileTableBody = document.getElementById('fileTable').getElementsByTagName('tbody')[0];
+            fileTableBody.innerHTML = ''; // Clear previous entries
 
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const paramName = 'p' + (i + 1);
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                filesData[paramName] = e.target.result.split('\n').map(line => line.trim()).filter(line => line);
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const paramName = 'p' + (i + 1);
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    filesData[paramName] = e.target.result.split('\n').map(line => line.trim()).filter(line => line);
 
-                const newRow = fileTableBody.insertRow();
-                const paramNameCell = newRow.insertCell(0);
-                const fileNameCell = newRow.insertCell(1);
-                const optionalCell = newRow.insertCell(2);
-                const removeCell = newRow.insertCell(3);
+                    const newRow = fileTableBody.insertRow();
+                    const paramNameCell = newRow.insertCell(0);
+                    const fileNameCell = newRow.insertCell(1);
+                    const optionalCell = newRow.insertCell(2);
+                    const removeCell = newRow.insertCell(3);
 
-                const paramLink = document.createElement('span');
-                paramLink.className = 'param-link';
-                paramLink.textContent = paramName;
-                paramLink.onclick = function() {
-                    document.getElementById('prompt').value += `, ${paramName}`;
+                    const paramLink = document.createElement('span');
+                    paramLink.className = 'param-link';
+                    paramLink.textContent = paramName;
+                    paramLink.onclick = function () {
+                        document.getElementById('prompt').value += `, ${paramName}`;
+                    };
+
+                    paramNameCell.appendChild(paramLink);
+                    fileNameCell.textContent = file.name;
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'optional';
+                    checkbox.value = paramName;
+                    optionalCell.appendChild(checkbox);
+
+                    const removeButton = document.createElement('button');
+                    removeButton.textContent = 'Remove';
+                    removeButton.onclick = function () {
+                        delete filesData[paramName];
+                        fileTableBody.removeChild(newRow);
+                    };
+                    removeCell.appendChild(removeButton);
                 };
-
-                paramNameCell.appendChild(paramLink);
-                fileNameCell.textContent = file.name;
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.name = 'optional';
-                checkbox.value = paramName;
-                optionalCell.appendChild(checkbox);
-                
-                const removeButton = document.createElement('button');
-                removeButton.textContent = 'Remove';
-                removeButton.onclick = function() {
-                    delete filesData[paramName];
-                    fileTableBody.removeChild(newRow);
-                };
-                removeCell.appendChild(removeButton);
-            };
-            reader.readAsText(file);
-        }
-    }
-
-    async function generatePrompts() {
-        const promptTemplate = document.getElementById('prompt').value;
-        const optionalParams = Array.from(document.querySelectorAll('input[name="optional"]:checked')).map(checkbox => checkbox.value);
-        const linesPerFile = parseInt(document.getElementById('linesPerFile').value, 10);
-        const randomGeneration = document.getElementById('randomGeneration').checked;
-        const resultElement = document.getElementById('result');
-        const progressBar = document.getElementById('progressBar');
-        const loadingMessage = document.getElementById('loadingMessage');
-
-        resultElement.textContent = '';
-        progressBar.style.width = '0%';
-        loadingMessage.style.display = 'block';
-        progressBar.parentElement.style.display = 'block';
-
-        if (randomGeneration) {
-            await generateRandomPrompts(promptTemplate, optionalParams, linesPerFile);
-        } else {
-            await generateAllPrompts(promptTemplate, optionalParams, linesPerFile);
+                reader.readAsText(file);
+            }
         }
 
-        progressBar.style.width = '100%';
-        loadingMessage.style.display = 'none';
-    }
+        async function generatePrompts() {
+            const promptTemplate = document.getElementById('prompt').value;
+            const optionalParams = Array.from(document.querySelectorAll('input[name="optional"]:checked')).map(checkbox => checkbox.value);
+            const linesPerFile = parseInt(document.getElementById('linesPerFile').value, 10);
+            const randomGeneration = document.getElementById('randomGeneration').checked;
+            const resultElement = document.getElementById('result');
+            const progressBar = document.getElementById('progressBar');
+            const loadingMessage = document.getElementById('loadingMessage');
 
-    async function generateRandomPrompts(template, optionalParams, linesPerFile) {
-        let params = Object.keys(filesData);
-        let combinations = [];
+            resultElement.textContent = '';
+            progressBar.style.width = '0%';
+            loadingMessage.style.display = 'block';
+            progressBar.parentElement.style.display = 'block';
 
-        for (let i = 0; i < linesPerFile; i++) {
-            let currentCombination = template;
-            for (let paramName of params) {
-                let values = filesData[paramName];
-                let randomIndex = Math.floor(Math.random() * values.length);
-                if (optionalParams.includes(paramName) && Math.random() < 0.5) {
-                    currentCombination = currentCombination.replace(new RegExp(`,?\\s*${paramName}`, 'g'), '');
-                } else {
-                    currentCombination = currentCombination.replace(paramName, values[randomIndex]);
+            if (randomGeneration) {
+                await generateRandomPrompts(promptTemplate, optionalParams, linesPerFile);
+            } else {
+                await generateAllPrompts(promptTemplate, optionalParams, linesPerFile);
+            }
+
+            progressBar.style.width = '100%';
+            loadingMessage.style.display = 'none';
+        }
+
+        async function generateRandomPrompts(template, optionalParams, linesPerFile) {
+            let params = Object.keys(filesData);
+            let combinations = [];
+
+            for (let i = 0; i < linesPerFile; i++) {
+                let currentCombination = template;
+                for (let paramName of params) {
+                    let values = filesData[paramName];
+                    let randomIndex = Math.floor(Math.random() * values.length);
+                    if (optionalParams.includes(paramName) && Math.random() < 0.5) {
+                        currentCombination = currentCombination.replace(new RegExp(`,?\\s*${paramName}(?![0-9])`, 'g'), '');
+                    } else {
+                        currentCombination = currentCombination.replace(new RegExp(`\\b${paramName}\\b`, 'g'), values[randomIndex]);
+                    }
                 }
-            }
-            currentCombination = currentCombination.replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^,\s*/, '');
-            combinations.push(currentCombination);
-            if (combinations.length >= linesPerFile) {
-                await downloadTxtFile(combinations, Math.ceil(i / linesPerFile));
-                combinations = [];
-            }
-        }
-
-        if (combinations.length > 0) {
-            await downloadTxtFile(combinations, Math.ceil(linesPerFile / linesPerFile));
-        }
-    }
-
-    async function generateAllPrompts(template, optionalParams, linesPerFile) {
-        let params = Object.keys(filesData);
-        let totalCombinations = calculateTotalCombinations(params, optionalParams);
-        let combinations = [];
-        let currentIndex = Array(params.length).fill(0);
-
-        for (let i = 0; i < totalCombinations; i++) {
-            let currentCombination = template;
-            let skipCombination = false;
-
-            for (let j = 0; j < params.length; j++) {
-                let paramName = params[j];
-                if (optionalParams.includes(paramName) && currentIndex[j] === 0) {
-                    currentCombination = currentCombination.replace(new RegExp(`,?\\s*${paramName}`, 'g'), '');
-                } else {
-                    currentCombination = currentCombination.replace(paramName, filesData[paramName][currentIndex[j]]);
+                currentCombination = currentCombination.replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^,\s*/, '');
+                combinations.push(currentCombination);
+                if (combinations.length >= linesPerFile) {
+                    await downloadTxtFile(combinations, Math.ceil(i / linesPerFile));
+                    combinations = [];
                 }
             }
 
-            currentCombination = currentCombination.replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^,\s*/, '');
-            combinations.push(currentCombination);
-
-            if (combinations.length >= linesPerFile) {
-                await downloadTxtFile(combinations, i / linesPerFile + 1);
-                combinations = [];
+            if (combinations.length > 0) {
+                await downloadTxtFile(combinations, Math.ceil(linesPerFile / linesPerFile));
             }
-
-            for (let k = params.length - 1; k >= 0; k--) {
-                currentIndex[k]++;
-                if (currentIndex[k] < filesData[params[k]].length) break;
-                currentIndex[k] = 0;
-            }
-
-            progressBar.style.width = (i / totalCombinations) * 100 + '%';
         }
 
-        if (combinations.length > 0) {
-            await downloadTxtFile(combinations, Math.ceil(totalCombinations / linesPerFile));
-        }
-    }
+        async function generateAllPrompts(template, optionalParams, linesPerFile) {
+            let params = Object.keys(filesData);
+            let totalCombinations = calculateTotalCombinations(params, optionalParams);
+            let combinations = [];
+            let currentIndex = Array(params.length).fill(0);
 
-    function calculateTotalCombinations(params, optionalParams) {
-        return params.reduce((acc, param) => {
-            if (optionalParams.includes(param)) {
-                return acc * (filesData[param].length + 1);
+            for (let i = 0; i < totalCombinations; i++) {
+                let currentCombination = template;
+                let skipCombination = false;
+
+                for (let j = 0; j < params.length; j++) {
+                    let paramName = params[j];
+                    if (optionalParams.includes(paramName) && currentIndex[j] === 0) {
+                        currentCombination = currentCombination.replace(new RegExp(`,?\\s*${paramName}(?![0-9])`, 'g'), '');
+                    } else {
+                        currentCombination = currentCombination.replace(new RegExp(`\\b${paramName}\\b`, 'g'), filesData[paramName][currentIndex[j]]);
+                    }
+                }
+
+                currentCombination = currentCombination.replace(/,\s*,/g, ',').replace(/,\s*$/, '').replace(/^,\s*/, '');
+                combinations.push(currentCombination);
+
+                if (combinations.length >= linesPerFile) {
+                    await downloadTxtFile(combinations, i / linesPerFile + 1);
+                    combinations = [];
+                }
+
+                for (let k = params.length - 1; k >= 0; k--) {
+                    currentIndex[k]++;
+                    if (currentIndex[k] < filesData[params[k]].length) break;
+                    currentIndex[k] = 0;
+                }
+
+                progressBar.style.width = (i / totalCombinations) * 100 + '%';
             }
-            return acc * filesData[param].length;
-        }, 1);
-    }
 
-    function calculateTotalLines() {
-        const params = Object.keys(filesData);
-        const optionalParams = Array.from(document.querySelectorAll('input[name="optional"]:checked')).map(checkbox => checkbox.value);
-        const totalCombinations = calculateTotalCombinations(params, optionalParams);
-        document.getElementById('summary').textContent = `Total Lines: ${totalCombinations}`;
-    }
+            if (combinations.length > 0) {
+                await downloadTxtFile(combinations, Math.ceil(totalCombinations / linesPerFile));
+            }
+        }
 
-    function downloadTxtFile(content, part) {
-        return new Promise((resolve) => {
-            const element = document.createElement('a');
-            const file = new Blob([content.join('\n')], { type: 'text/plain' });
-            element.href = URL.createObjectURL(file);
-            element.download = `generated_prompts_part_${part}.txt`;
-            document.body.appendChild(element); // Required for this to work in FireFox
-            element.click();
-            document.body.removeChild(element);
-            resolve();
-        });
-    }
-</script>
+        function calculateTotalCombinations(params, optionalParams) {
+            return params.reduce((acc, param) => {
+                if (optionalParams.includes(param)) {
+                    return acc * (filesData[param].length + 1);
+                }
+                return acc * filesData[param].length;
+            }, 1);
+        }
+
+        function calculateTotalLines() {
+            const params = Object.keys(filesData);
+            const optionalParams = Array.from(document.querySelectorAll('input[name="optional"]:checked')).map(checkbox => checkbox.value);
+            const totalCombinations = calculateTotalCombinations(params, optionalParams);
+            document.getElementById('summary').textContent = `Total Lines: ${totalCombinations}`;
+        }
+
+        function downloadTxtFile(content, part) {
+            return new Promise((resolve) => {
+                const element = document.createElement('a');
+                const file = new Blob([content.join('\n')], { type: 'text/plain' });
+                element.href = URL.createObjectURL(file);
+                element.download = `generated_prompts_part_${part}.txt`;
+                document.body.appendChild(element); // Required for this to work in FireFox
+                element.click();
+                document.body.removeChild(element);
+                resolve();
+            });
+        }
+    </script>
 
 </body>
+
 </html>
