@@ -13,7 +13,6 @@
       justify-content: center;
       align-items: center;
       margin: 0;
-      height: 100vh;
     }
 
     .container {
@@ -157,7 +156,7 @@
         const payload = {
           model: model,
           prompt: prompt,
-          stream: false,
+          stream: true,
           images: []
         };
 
@@ -188,6 +187,9 @@
 
           responseDiv.style.display = 'block';
 
+          isValidJson = true;
+          let notValidJson = '';
+
           while (!done) {
             const { value, done: readerDone } = await reader.read();
             done = readerDone;
@@ -201,7 +203,17 @@
                 continue;
               }
               try {
-                const data = JSON.parse(chunk);
+                let chunkToEncode = chunk;
+
+                if (!isValidJson) {
+                  notValidJson += chunk;
+                  chunkToEncode = notValidJson;
+                }
+
+                const data = JSON.parse(chunkToEncode);
+
+                isValidJson = true;
+                notValidJson = '';
 
                 if (isLoadingShowed) {
                   responseDiv.innerText = displayPrompt;
@@ -210,8 +222,8 @@
 
                 responseDiv.innerText += data.response;
               } catch (error) {
-                console.error('JSON parse error:', error);
-                responseDiv.innerText += '\nError parsing response: ' + error.message;
+                isValidJson = false;
+                notValidJson = chunk;
               }
             }
           }
