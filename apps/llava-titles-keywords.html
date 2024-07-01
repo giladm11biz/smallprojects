@@ -105,7 +105,7 @@
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            model: 'llava',
+                            model: 'llava:13b',
                             prompt: 'write me a one sentenced title in one sentence for this image that best describes the image, style, what it represents and what it can bu used for. try to include keywords for people who might look for a photo like this. remove unnecessary word. keep it under 190 chars',
                             stream: false,
                             images: [base64]
@@ -117,7 +117,7 @@
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            model: 'llava',
+                            model: 'llava:13b',
                             prompt: 'write me the top 15 words that best describes the image, style, what it represents and what it can bu used for, in one word, and put the most relevant and important ones first. use commas and no numbers',
                             stream: false,
                             images: [base64]
@@ -169,7 +169,7 @@
                         canvas.width = originalWidth * scaleFactor;
                         canvas.height = originalHeight * scaleFactor;
 
-                        console.log(canvas.width * canvas.height, 451584, canvas.width * canvas.height <= 451584);
+                        // console.log(canvas.width * canvas.height, 451584, canvas.width * canvas.height <= 451584);
 
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
