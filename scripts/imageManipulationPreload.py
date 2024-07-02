@@ -5,13 +5,12 @@
 import os
 import shutil
 import json
+import threading
 from collections import deque
 from tkinter import Tk, Button, Label, Listbox, Scrollbar, simpledialog, Canvas, NW
 from tkinter import filedialog
 from tkinter import ttk
 from PIL import Image, ImageTk, ImageOps
-import threading
-
 
 class ImageViewer:
     def __init__(self, root):
@@ -31,6 +30,8 @@ class ImageViewer:
         self.crop_start_y = 0
 
         self.undo_stack = deque(maxlen=10)  # Limit to last 10 actions
+
+        self.image_cache = {}
 
         self.create_widgets()
         self.load_images()
@@ -53,7 +54,8 @@ class ImageViewer:
     def load_images(self):
         self.image_list = [f for f in os.listdir(self.settings['source_folder']) if os.path.isfile(os.path.join(self.settings['source_folder'], f))]
         self.current_image_index = 0
-        self.show_image()
+        self.load_image(self.current_image_index)
+        self.start_preloading()
 
     def create_widgets(self):
         self.button_frame = ttk.Frame(self.root)
@@ -143,7 +145,6 @@ class ImageViewer:
 
         self.rearrange_buttons()
 
-
     def on_resize(self, event):
         self.rearrange_buttons()
 
@@ -215,12 +216,22 @@ class ImageViewer:
         try:
             if not self.image_list:
                 return
-            image_path = os.path.join(self.settings['source_folder'], self.image_list[self.current_image_index])
-            self.original_image = Image.open(image_path)
-            self.display_image = self.original_image.copy()
+            image_name = self.image_list[self.current_image_index]
+            if image_name in self.image_cache:
+                self.display_image = self.image_cache[image_name]
+            else:
+                self.load_image(self.current_image_index)
             self.update_image()
+            self.start_preloading()
         except Exception as e:
             self.handle_exception(e)
+
+    def load_image(self, index):
+        image_name = self.image_list[index]
+        image_path = os.path.join(self.settings['source_folder'], image_name)
+        self.original_image = Image.open(image_path)
+        self.display_image = self.original_image.copy()
+        self.image_cache[image_name] = self.display_image
 
     def update_image(self):
         try:
@@ -305,6 +316,7 @@ class ImageViewer:
             self.display_image = self.display_image.crop((x1, y1, x2, y2))
             self.original_image = self.display_image.copy()
             self.original_image.save(os.path.join(self.settings['source_folder'], self.image_list[self.current_image_index]))
+            self.image_cache[self.image_list[self.current_image_index]] = self.display_image
 
             self.cancel_crop()
 
@@ -352,8 +364,10 @@ class ImageViewer:
 
     def delete_image(self):
         try:
-            self.undo_stack.append((self.original_image.copy(), "delete", self.image_list[self.current_image_index]))
-            os.remove(os.path.join(self.settings['source_folder'], self.image_list[self.current_image_index]))
+            image_name = self.image_list[self.current_image_index]
+            self.undo_stack.append((self.original_image.copy(), "delete", image_name))
+            os.remove(os.path.join(self.settings['source_folder'], image_name))
+            del self.image_cache[image_name]
             del self.image_list[self.current_image_index]
             if self.current_image_index >= len(self.image_list):
                 self.current_image_index -= 1
@@ -399,7 +413,6 @@ class ImageViewer:
         except Exception as e:
             self.handle_exception(e)
 
-
     def move_image_with_hotkey(self, event):
         try:
             if event.char.isdigit():
@@ -421,6 +434,8 @@ class ImageViewer:
                 dest_path = os.path.join(folder, os.path.basename(src_path))
                 self.undo_stack.append((src_path, "move", folder))
                 shutil.move(src_path, dest_path)
+                image_name = self.image_list[self.current_image_index]
+                del self.image_cache[image_name]
                 del self.image_list[self.current_image_index]
                 if self.current_image_index >= len(self.image_list):
                     self.current_image_index -= 1
@@ -437,16 +452,19 @@ class ImageViewer:
                 self.display_image = last_action[0]
                 self.original_image = self.display_image.copy()
                 self.original_image.save(os.path.join(self.settings['source_folder'], self.image_list[self.current_image_index]))
+                self.image_cache[self.image_list[self.current_image_index]] = self.display_image
                 self.update_image()
             elif last_action[1] == "delete":
                 self.image_list.insert(self.current_image_index, last_action[2])
                 last_action[0].save(os.path.join(self.settings['source_folder'], last_action[2]))
+                self.image_cache[last_action[2]] = last_action[0]
                 self.show_image()
             elif last_action[1] == "move":
                 src_path, _, folder = last_action
                 dest_path = os.path.join(folder, os.path.basename(src_path))
                 shutil.move(dest_path, src_path)
                 self.image_list.insert(self.current_image_index, os.path.basename(src_path))
+                self.load_image(self.current_image_index)
                 self.show_image()
         except Exception as e:
             self.handle_exception(e)
@@ -491,6 +509,21 @@ class ImageViewer:
     def handle_exception(self, exception):
         self.status_bar.config(style="Error.TLabel")
         raise exception  # Re-raise the exception after handling
+
+    def preload_images(self):
+        for i in range(1, 11):
+            index = (self.current_image_index + i) % len(self.image_list)
+            image_name = self.image_list[index]
+            if image_name not in self.image_cache:
+                image_path = os.path.join(self.settings['source_folder'], image_name)
+                try:
+                    image = Image.open(image_path).copy()
+                    self.image_cache[image_name] = image
+                except Exception as e:
+                    self.handle_exception(e)
+
+    def start_preloading(self):
+        threading.Thread(target=self.preload_images, daemon=True).start()
 
 if __name__ == "__main__":
     root = Tk()
