@@ -217,6 +217,7 @@ class ImageViewer:
             if not self.image_list:
                 return
             image_name = self.image_list[self.current_image_index]
+            self.status_bar.config(text=f"Zoom: {self.zoom_level * 100:.0f}% | {image_name}")
             if image_name in self.image_cache:
                 self.display_image = self.image_cache[image_name]
             else:
@@ -241,7 +242,8 @@ class ImageViewer:
                 self.canvas.itemconfig(self.canvas_image_id, image=self.tk_img)
             else:
                 self.canvas_image_id = self.canvas.create_image(0, 0, anchor=NW, image=self.tk_img)
-            self.status_bar.config(text=f"Zoom: {self.zoom_level * 100:.0f}%")
+            image_name = self.image_list[self.current_image_index]
+            self.status_bar.config(text=f"Zoom: {self.zoom_level * 100:.0f}% | {image_name}")
         except Exception as e:
             self.handle_exception(e)
 
@@ -333,9 +335,6 @@ class ImageViewer:
             self.canvas.xview_moveto(new_xview_start)
             self.canvas.yview_moveto(new_yview_start)
 
-            # Rebind events for panning
-            self.canvas.bind("<ButtonPress-1>", self.start_pan_image)
-            self.canvas.bind("<B1-Motion>", self.pan_image)
         except Exception as e:
             self.handle_exception(e)
 
@@ -356,9 +355,14 @@ class ImageViewer:
                 self.canvas.unbind("<Button-1>")
                 self.canvas.unbind("<B1-Motion>")
                 self.canvas.unbind("<ButtonRelease-1>")
+
                 if self.crop_rectangle:
                     self.canvas.delete(self.crop_rectangle)
                     self.crop_rectangle = None
+
+                # Rebind events for panning
+                self.canvas.bind("<ButtonPress-1>", self.start_pan_image)
+                self.canvas.bind("<B1-Motion>", self.pan_image)
         except Exception as e:
             self.handle_exception(e)
 
@@ -519,6 +523,9 @@ class ImageViewer:
                 try:
                     image = Image.open(image_path).copy()
                     self.image_cache[image_name] = image
+                    if index == self.current_image_index:
+                        self.display_image = image
+                        self.update_image()
                 except Exception as e:
                     self.handle_exception(e)
 

@@ -318,10 +318,6 @@ class ImageViewer:
 
             self.canvas.xview_moveto(new_xview_start)
             self.canvas.yview_moveto(new_yview_start)
-
-            # Rebind events for panning
-            self.canvas.bind("<ButtonPress-1>", self.start_pan_image)
-            self.canvas.bind("<B1-Motion>", self.pan_image)
         except Exception as e:
             self.handle_exception(e)
 
@@ -345,6 +341,10 @@ class ImageViewer:
                 if self.crop_rectangle:
                     self.canvas.delete(self.crop_rectangle)
                     self.crop_rectangle = None
+
+                # Rebind events for panning
+                self.canvas.bind("<ButtonPress-1>", self.start_pan_image)
+                self.canvas.bind("<B1-Motion>", self.pan_image)
         except Exception as e:
             self.handle_exception(e)
 
