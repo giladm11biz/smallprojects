@@ -13,6 +13,8 @@ output_format = "png"
 negative_prompt = "unrealistic, saturated, high contrast, big nose, painting, drawing, sketch, cartoon, anime, manga, render, CG, 3d, watermark, signature, label, company logos, copyrighted logos, brand symbols, trademarks"
 add_to_prompt = ", 8k, highly detailed, high quality" # Detailed natural skin and blemishes without-makeup and acne
 base_model_name = "zavychromaxl_v80.safetensors"
+image_dir = "for_upscale"
+output_dir = "upscaled_images"
 
 # List of styles
 styles = [
@@ -35,7 +37,8 @@ lora = [
 ]
 
 # Directory containing images to upscale
-image_dir = "for_upscale_test_group"
+os.makedirs(output_dir, exist_ok=True)
+
 
 def encode_image_to_base64(image_path):
     with open(image_path, "rb") as image_file:
@@ -134,13 +137,41 @@ for image_file in image_files:
         "webhook_url": ""
     }
 
+
+    print(f"Upscaling 2x...")
+
     # Send the request to the API
     response = requests.post(api_url, json=payload)
+    result = response.json()
 
-    # Handle the response
     if response.status_code == 200:
-        print(f"Successfully upscaled")
+        image_url = result['result'][0]
+        image_base64 = base64.b64encode(requests.get(image_url).content).decode('utf-8')
+
+        payload["uov_input_image"] = image_base64
+        payload["uov_method"] = "Upscale (1.5x)"
+
+        print(f"Upscaling 1.5x more...")
+        response = requests.post(api_url, json=payload)
+        # Get the result
+        result = response.json()       
+
+        # Handle the response
+        if response.status_code == 200:
+            image_url = result['result'][0]
+            output_image_path = os.path.join(output_dir, f"upscaled_{image_file}")
+
+            with open(output_image_path, "wb") as out_file:
+                out_file.write(requests.get(image_url).content)
+
+            os.remove(image_path) # delete original image
+
+            print(f"Successfully upscaled and saved")
+        else:
+            print(f"Failed to upscale 1.5 image: {image_path}")
+            print("Status Code:", response.status_code)
+            print("Response:", response.text)
     else:
-        print(f"Failed to upscale image: {image_path}")
+        print(f"Failed to upscale 2x image: {image_path}")
         print("Status Code:", response.status_code)
         print("Response:", response.text)
