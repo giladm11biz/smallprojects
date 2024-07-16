@@ -1,6 +1,11 @@
 import requests
 import os
 import base64
+import json
+from PIL import Image
+from io import BytesIO
+
+
 
 # URL of the Fooocus API endpoint
 api_url = "http://localhost:7866/v1/engine/generate/"
@@ -11,7 +16,7 @@ performance = "Quality"
 preset = "Realistic"
 output_format = "png"
 negative_prompt = "unrealistic, saturated, high contrast, big nose, painting, drawing, sketch, cartoon, anime, manga, render, CG, 3d, watermark, signature, label, company logos, copyrighted logos, brand symbols, trademarks"
-add_to_prompt = ", 8k, highly detailed, high quality" # Detailed natural skin and blemishes without-makeup and acne
+prompt = ""
 base_model_name = "zavychromaxl_v80.safetensors"
 image_dir = "for_upscale"
 output_dir = "upscaled_images"
@@ -40,9 +45,14 @@ lora = [
 os.makedirs(output_dir, exist_ok=True)
 
 
-def encode_image_to_base64(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+def get_png_metadata(img):
+    return 
+
+
+def encode_image_to_base64(img):
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 image_files = [f for f in os.listdir(image_dir) if os.path.isfile(os.path.join(image_dir, f))]
 total_images = len(image_files)
@@ -51,12 +61,24 @@ current_image_num = 0
 for image_file in image_files:
     current_image_num += 1
     image_path = os.path.join(image_dir, image_file)
-    image_base64 = encode_image_to_base64(image_path)
+    metadata = None
+    image_base64 = None
+
+    with Image.open(image_path) as img:
+        metadata = img.info
+        image_base64 = encode_image_to_base64(img)
+
+    
+    if (metadata and 'parameters' in metadata):
+        original_image_parameters = json.loads(metadata['parameters'])
+        prompt = original_image_parameters['full_prompt'][1]
+        negative_prompt = original_image_parameters['negative_prompt'][1]
+
     print(f"Processing image {current_image_num}/{total_images}: {image_path}")
 
     # Create the request payload
     payload = {
-        "prompt": "",
+        "prompt": prompt,
         "negative_prompt": negative_prompt,
         "style_selections": styles,
         "performance_selection": performance,
@@ -161,10 +183,14 @@ for image_file in image_files:
             image_url = result['result'][0]
             output_image_path = os.path.join(output_dir, f"upscaled_{image_file}")
 
-            with open(output_image_path, "wb") as out_file:
-                out_file.write(requests.get(image_url).content)
-
-            os.remove(image_path) # delete original image
+            with Image.open(BytesIO(requests.get(image_url).content)) as img:
+                # Create a copy of the image without the info dictionary
+                img_no_metadata = Image.new(img.mode, img.size)
+                img_no_metadata.putdata(list(img.getdata()))
+                
+                # Save the image without metadata
+                img_no_metadata.save(output_image_path, "PNG")
+                os.remove(image_path) # delete original image
 
             print(f"Successfully upscaled and saved")
         else:
